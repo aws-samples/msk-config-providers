@@ -105,6 +105,54 @@
 					</archive>
 				</configuration>
 			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-shade-plugin</artifactId>
+				<version>3.2.4</version>
+				<configuration>
+					<createDependencyReducedPom>false</createDependencyReducedPom>
+					<filters>
+						<filter>
+							<artifact>*:*</artifact>
+							<excludes>
+								<exclude>module-info.class</exclude>
+							</excludes>
+						</filter>
+					</filters>
+				</configuration>
+				<executions>
+					<execution>
+						<phase>package</phase>
+						<goals>
+							<goal>shade</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>${project.build.directory}/shade-uber</outputDirectory>
+							<finalName>${project.artifactId}-${project.version}-uber</finalName>
+							<artifactSet>
+								<excludes>
+									<exclude>org.apache.kafka:*</exclude>
+									<exclude>slf4j-api:*</exclude>
+									<exclude>com.fasterxml.jackson.annotation:*</exclude>
+									<exclude>com.fasterxml.jackson.core:*</exclude>
+									<exclude>com.fasterxml.jackson.dataformat:*</exclude>
+									<exclude>com.fasterxml.jackson.dataformat:*</exclude>
+									<exclude>jackson*:jackson-databind:jar:</exclude>
+								</excludes>
+							</artifactSet>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.10.0</version>
+				<configuration>
+					<release>11</release>
+				</configuration>
+			</plugin>
+
 		</plugins>
 	</build>
 </project>
