@@ -57,6 +57,16 @@ target
 └─── msk-config-providers-<VERSION>.jar
 ```
 
+Additionally, there is a flat UBER jar at the following location:
+
+```
+target
+├── shade-uber
+│   └── msk-config-providers-<VERSION>-uber.jar
+└── .......
+```
+
+
 ## Access Management
 
 Currently config providers do not support credentials to be explicitly provided. Config provider will inherit any type of credentials of hosting application, OS or service.
