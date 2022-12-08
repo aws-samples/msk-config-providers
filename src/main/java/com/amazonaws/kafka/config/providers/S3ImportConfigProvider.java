@@ -116,12 +116,12 @@ public class S3ImportConfigProvider implements ConfigProvider {
             try {
                 Path pKey = Path.of(key);
                 Path destination = getDestination(this.localDir, pKey);
-                log.debug("Local destination for file: " + destination.toString());
+                log.debug("Local destination for file: {}", destination);
                 
                 if (Files.exists(destination)) {
                     // Imported file may already exist on a file system. If tasks are restarting, 
                     // or more than one task is running on a worker, they may use the same file
-                    log.info("File already imported at destination: " + destination.toString());
+                    log.info("File already imported at destination: {}", destination);
                     data.put(key, destination.toString());
                     continue;
                 }
@@ -130,7 +130,7 @@ public class S3ImportConfigProvider implements ConfigProvider {
                         .key(getS3ObjectKey(pKey))
                         .build();
                 s3.getObject(s3GetObjectRequest, destination);
-                log.debug("Successfully imported a file from S3 bucket: s3://" + key);
+                log.debug("Successfully imported a file from S3 bucket: s3://{}", key);
                 data.put(key, destination.toString());
             } catch(NoSuchKeyException nske) {
                 // Simply throw an exception to indicate there are issues with the objects on S3
