@@ -116,59 +116,31 @@ public class S3ImportConfigProvider implements ConfigProvider {
             try {
                 Path pKey = Path.of(key);
                 Path destination = getDestination(this.localDir, pKey);
-                log.debug("Local destination for file: " + destination.toString());
+                log.debug("Local destination for file: {}", destination);
                 
                 if (Files.exists(destination)) {
                     // Imported file may already exist on a file system. If tasks are restarting, 
                     // or more than one task is running on a worker, they may use the same file
+                    log.info("File already imported at destination: {}", destination);
                     data.put(key, destination.toString());
                     continue;
-                }else if (!isValidDestination(destination)) {
-                    
                 }
-                
                 GetObjectRequest s3GetObjectRequest = GetObjectRequest.builder()
                         .bucket(getBucket(pKey))
                         .key(getS3ObjectKey(pKey))
                         .build();
                 s3.getObject(s3GetObjectRequest, destination);
+                log.debug("Successfully imported a file from S3 bucket: s3://{}", key);
                 data.put(key, destination.toString());
             } catch(NoSuchKeyException nske) {
                 // Simply throw an exception to indicate there are issues with the objects on S3
                 throw new RuntimeException("No object found at " + key, nske);
-            } catch (IOException e) {
-                // looks like a file cannot be created at destination...
-                log.error("Failed to import a file from S3.", e);
-                // wrapping into runtime to allow retries
-                throw new RuntimeException(e);
             }
         }
 
         return new ConfigData(data);
     }
     
-    
-    /*
-     * Validates the destination: if file exists, the destination is not valid and `false` will be returned.
-     */
-    private boolean isValidDestination(Path destination) throws IOException {
-        // Alternatively, use this file!!
-        if (Files.exists(destination)) {
-            log.warn("Destination file %s already exists. Exiting with error...", destination.toString());
-            return false;
-        }
-        Path parentDir = destination.getParent();
-        if (Files.notExists(parentDir)) {
-            try {
-                Files.createDirectories(parentDir);
-            } catch (IOException e) {
-                log.error("Couldn't create parent directory: " + parentDir.toString());
-                throw e;
-            }
-        }
-        return true;
-    }
-
     private static Path getDestination(String localDir, Path pKey) {
         Path pDest = Path.of(localDir, pKey.getName(pKey.getNameCount()-1).toString());
         return pDest;
