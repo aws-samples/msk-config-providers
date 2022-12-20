@@ -26,9 +26,10 @@ import java.util.Set;
 
 import org.apache.kafka.common.config.ConfigChangeCallback;
 import org.apache.kafka.common.config.ConfigData;
-import org.apache.kafka.common.config.provider.ConfigProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.amazonaws.kafka.config.providers.common.AwsServiceConfigProvider;
 
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -63,25 +64,25 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
  * <code>property_name=${s3import:<REGION>:<OBJECT_KEY>}</code>
  *
  */
-public class S3ImportConfigProvider implements ConfigProvider {
+public class S3ImportConfigProvider extends AwsServiceConfigProvider {
     
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    
-    private S3ImportConfigDef config;
+    private S3ImportConfig config;
 
     private String localDir;
-    private String defaultRegion;
 
 
+    @Override
     public void configure(Map<String, ?> configs) {
-        this.config = new S3ImportConfigDef(configs);
-        this.localDir = this.config.getString(S3ImportConfigDef.LOCAL_DIR);
+        this.config = new S3ImportConfig(configs);
+        setCommonConfig(config);
+
+        this.localDir = this.config.getString(S3ImportConfig.LOCAL_DIR);
         if (this.localDir == null || this.localDir.isBlank()) {
+            // if not defined, use temp dir defined in OS
             this.localDir = System.getProperty("java.io.tmpdir");
         }
-        // default region from configuration. It can be null, empty or blank.
-        this.defaultRegion = this.config.getString(S3ImportConfigDef.REGION);
     }
 
     /**
@@ -90,27 +91,27 @@ public class S3ImportConfigProvider implements ConfigProvider {
      * @param path the path in Parameters Store
      * @return the configuration data
      */
-    public ConfigData get(String path) {
+   @Override
+   public ConfigData get(String path) {
         return get(path, Collections.emptySet());
     }
-
     
     /**
-     * Retrieves all parameters at the given path in SSM Parameters Store with given key.
+     * Copies a file from S3 to a local (to a process) file system.
      *
-     * @param path the path in Parameters Store
-     * @return the configuration data
+     * @param path (optional) a region where an S3 object is located. If null, 
+     *        a default region from config provider's configuration will be used.
+     * @return the configuration data with resolved variables.
      */
+    @Override
     public ConfigData get(String path, Set<String> keys) {
         Map<String, String> data = new HashMap<>();
         if (   (path == null || path.isEmpty()) 
             && (keys== null || keys.isEmpty())   ) {
             return new ConfigData(data);
         }
-        // regionDef still can be null!
-        String regionDef = path != null && !path.isBlank() ? path : this.defaultRegion;
 
-        S3Client s3 = getS3Client(regionDef);
+        S3Client s3 = checkOrInitS3Client(path);
 
         for (String key: keys) {
             try {
@@ -160,16 +161,22 @@ public class S3ImportConfigProvider implements ConfigProvider {
         log.info("Subscription is not implemented and will be ignored");
     }
 
-
+    @Override
     public void close() throws IOException {
     }
     
-    protected static S3Client getS3Client(String regionStr) {
+    protected S3Client checkOrInitS3Client(String regionStr) {
         S3ClientBuilder s3cb = S3Client.builder();
-        if (regionStr != null && !regionStr.isBlank()) s3cb.region(Region.of(regionStr));
-        S3Client s3Client = s3cb.build(); 
+
+        setClientCommonConfig(s3cb);
+        
+        // If region is not provided as path, then Common Config sets default region. 
+        // No need to override.
+        if (regionStr != null && !regionStr.isBlank()) {
+            s3cb.region(Region.of(regionStr));
+        }
             
-        return s3Client;
+        return s3cb.build();
     }
     
     

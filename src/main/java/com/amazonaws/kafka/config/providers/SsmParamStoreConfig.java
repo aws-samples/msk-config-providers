@@ -20,35 +20,36 @@ import java.util.Map;
 
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
+import org.apache.kafka.common.config.ConfigDef.ValidString;
 
-public class S3ImportConfigDef extends AbstractConfig{
+import com.amazonaws.kafka.config.providers.common.CommonConfigUtils;
 
-    public static final String LOCAL_DIR = "local_dir";
-    private static final String LOCAL_DIR_DOC = 
-            "Local directory to store imported from S3 files. " + 
-            "If not provided, temporary directory defined in OS will be used.)";
-    public static final String REGION = "region";
-    private static final String REGION_DOC = "Specify region if needed. Default region is the same where connector is running";
+public class SsmParamStoreConfig extends AbstractConfig{
 
-    public S3ImportConfigDef(Map<?, ?> originals) {
+    public static final String NOT_FOUND_STRATEGY = "NotFoundStrategy";
+    public static final String NOT_FOUND_FAIL = "fail";
+    public static final String NOT_FOUND_IGNORE = "ignore";
+    
+    private static final String NOT_FOUND_STRATEGY_DOC = 
+            "An action to take in case a secret cannot be found. "
+            + "Possible actions are: `ignore` and `fail`. <br>"
+            + "If `ignore` is selected and a secret cannot be found, the empty string will be assigned to a parameter.<br>"
+            + "If `fail` is selected, the config provider will throw an exception to signal the issue.<br>"
+            + "If there is a connectivity or access issue with AWS Secrets Manager service, an exception will be thrown.";
+
+    public SsmParamStoreConfig(Map<?, ?> originals) {
         super(config(), originals);
     }
 
     private static ConfigDef config() {
-        return new ConfigDef()
+        return new ConfigDef(CommonConfigUtils.COMMON_CONFIG)
                 .define(
-                        LOCAL_DIR,
+                        NOT_FOUND_STRATEGY,
                         ConfigDef.Type.STRING,
-                        null,
-                        ConfigDef.Importance.HIGH,
-                        LOCAL_DIR_DOC
-                        )
-                .define(
-                        REGION,
-                        ConfigDef.Type.STRING,
-                        ConfigDef.NO_DEFAULT_VALUE,
+                        NOT_FOUND_IGNORE,
+                        ValidString.in(NOT_FOUND_FAIL, NOT_FOUND_IGNORE),
                         ConfigDef.Importance.LOW,
-                        REGION_DOC
+                        NOT_FOUND_STRATEGY_DOC
                         )
                 ;
     }

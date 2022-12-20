@@ -27,6 +27,7 @@ import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigDef.Importance;
 import org.apache.kafka.common.config.ConfigDef.Type;
+import org.apache.kafka.common.config.ConfigException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.services.secretsmanager.model.ResourceNotFoundException;
@@ -40,7 +41,7 @@ public class SecretsManagerConfigProviderTest {
 		props.put("config.providers", "secretsmanager");
 		props.put("config.providers.secretsmanager.class", "com.amazonaws.kafka.config.providers.MockedSecretsManagerConfigProvider");
 		props.put("config.providers.secretsmanager.param.region", "us-west-2");
-		props.put("config.providers.secretsmanager.param.ParameterNotFoundStrategy", "fail");
+		props.put("config.providers.secretsmanager.param.NotFoundStrategy", "fail");
 	}
     
     @Test
@@ -54,11 +55,17 @@ public class SecretsManagerConfigProviderTest {
     	assertEquals("Password123", testConfig.getString("password"));
     }
 
-	@Test
-	public void testNonExistingKeys() {
-		props.put("notFound", "${secretsmanager:notFound:noKey}");
-		assertThrows(ResourceNotFoundException.class, () ->new CustomConfig(props));
-	}
+    @Test
+    public void testNonExistingSecret() {
+        props.put("notFound", "${secretsmanager:notFound:noKey}");
+        assertThrows(ResourceNotFoundException.class, () ->new CustomConfig(props));
+    }
+    
+    @Test
+    public void testNonExistingKey() {
+        props.put("notFound", "${secretsmanager:AmazonMSK_TestKafkaConfig:noKey}");
+        assertThrows(ConfigException.class, () ->new CustomConfig(props));
+    }
     
     static class CustomConfig extends AbstractConfig {
     	final static String DEFAULT_DOC = "Default Doc";

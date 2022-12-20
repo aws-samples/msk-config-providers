@@ -25,14 +25,13 @@ import java.util.Set;
 import org.apache.kafka.common.config.ConfigChangeCallback;
 import org.apache.kafka.common.config.ConfigData;
 import org.apache.kafka.common.config.ConfigException;
-import org.apache.kafka.common.config.provider.ConfigProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.amazonaws.kafka.config.providers.common.AwsServiceConfigProvider;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClientBuilder;
 import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueRequest;
@@ -48,7 +47,7 @@ import software.amazon.awssdk.services.secretsmanager.model.ResourceNotFoundExce
  * <pre>
  * #        Step1. Configure the secrets manager as config provider:
  * config.providers=secretsmanager
- * config.providers.secretsmanager.class=com.amazonaws.kafka.connect.config.providers.SecretsMamagerConfigProvider
+ * config.providers.secretsmanager.class=com.amazonaws.kafka.config.providers.SecretsMamagerConfigProvider
  * # optional parameter for region:
  * config.providers.secretsmanager.param.region=us-west-2
  * # optional parameter, see more details below
@@ -59,7 +58,7 @@ import software.amazon.awssdk.services.secretsmanager.model.ResourceNotFoundExce
  * db.password=${secretsmanager:AmazonMSK_TestKafkaConfig:password}
  * </pre>
  * 
- * Note, this config provide implementation assumes secret values will be returned in Json format.
+ * Note, this config provider implementation assumes secret values will be returned in Json format.
  * Nested values aren't supported at this point.<br>
  * 
  * SecretsManagerConfigProvider can be configured using parameters.<br>
@@ -71,8 +70,6 @@ import software.amazon.awssdk.services.secretsmanager.model.ResourceNotFoundExce
  * <ul>Passible values are:
  * 	<ul>{@code fail} - (Default) the code will throw an exception {@code ConfigNotFoundException}</ul>
  * 	<ul>{@code ignore} - a value will remain with tokens without any change </ul>
- *  <ul>{@code empty} - empty string will be assigned to a config</ul>
- *  <ul>any other value is equivalent to {@code ignore}</ul>
  * </ul>
  * 
  * 
@@ -80,137 +77,116 @@ import software.amazon.awssdk.services.secretsmanager.model.ResourceNotFoundExce
  * <code>property_name=${secretsmanager:secret.id:secret.key}</code>
  *
  */
-public class SecretsManagerConfigProvider implements ConfigProvider {
-	
+public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
+    
     private final Logger log = LoggerFactory.getLogger(getClass());
+    
+    private static final String EMPTY = "";
 
-	
-	public static final String REGION_PARAM_NAME = "region";
-	public static final String NOT_FOUND_STRATEGY_PARAM_NAME = "NotFoundStrategy";
+    private SecretsManagerConfig config;
+    private String notFoundStrategy;
 
-	private String region;
-	private ParamNotFoundStrategy notFoundStrategy = ParamNotFoundStrategy.FAIL;
-	protected SecretsManagerClient secretsClient;
-
+    private SecretsManagerClientBuilder cBuilder;
+    
+    @Override
 	public void configure(Map<String, ?> configs) {
-		Object value;
-		if ((value = configs.get(REGION_PARAM_NAME)) != null) {
-			this.region = value.toString();
-		}
-		if ((value = configs.get(NOT_FOUND_STRATEGY_PARAM_NAME)) != null) {
-			this.notFoundStrategy = ParamNotFoundStrategy.of((String)value);
-		}
+	    this.config = new SecretsManagerConfig(configs);
+        setCommonConfig(config);
+
+        this.notFoundStrategy = config.getString(SecretsManagerConfig.NOT_FOUND_STRATEGY);
+        
+        // set up a builder:
+        this.cBuilder = SecretsManagerClient.builder();
+        setClientCommonConfig(this.cBuilder);
 	}
 
     /**
-     * Retrieves all parameters at the given path in SSM Parameters Store.
+     * Retrieves a secret from AWS Secrets Manager
      *
      * @param path the path in Parameters Store
      * @return the configuration data
      */
+    @Override
     public ConfigData get(String path) {
         return get(path, Collections.emptySet());
     }
 
     
     /**
-     * Retrieves all parameters at the given path in SSM Parameters Store with given key.
+     * Retrieves secret's fields from a given secret.
      *
-     * @param path the path in Parameters Store
+     * @param path AWS Secrets Manager <code> secret </code>
+     * @param keys fields inside a given secret.
      * @return the configuration data
      */
+    @Override
 	public ConfigData get(String path, Set<String> keys) {
         Map<String, String> data = new HashMap<>();
-		if (   (path == null || path.isEmpty()) 
-			&& (keys== null || keys.isEmpty())   ) {
+		if (   path == null || path.isEmpty() 
+			|| keys== null || keys.isEmpty()   ) {
+		    // if no fields provided, just ignore this usage
 			return new ConfigData(data);
 		}
 
-		checkOrInitSecretManagerClient();
-
 		GetSecretValueRequest request = GetSecretValueRequest.builder().secretId(path).build();
+		Map<String, String> secretJson = null;
 		try {
-			GetSecretValueResponse response = secretsClient.getSecretValue(request);
+			SecretsManagerClient secretsClient = checkOrInitSecretManagerClient();
+            GetSecretValueResponse response = secretsClient .getSecretValue(request);
 			String value = response.secretString();
 			
-			Map<String, String> secretJson;
-			try {
-				secretJson = new ObjectMapper().readValue(value, new TypeReference<>() {});
-			} catch (Exception e) {
-				log.error("Unexpected value of a secret's structure", e);
-				throw new ConfigException(path, value, "Unexpected value of a secret's structure");
+	        
+	        try {
+	            secretJson = new ObjectMapper().readValue(value, new TypeReference<>() {});
+	        } catch (Exception e) {
+	            log.error("Unexpected value of a secret's structure", e);
+	            throw new ConfigException(path, value, "Unexpected value of a secret's structure");
+	        }
+        } catch(ResourceNotFoundException e) {
+            log.info("Secret id {} not found. Value will be handled according to a strategy defined by 'NotFoundStrategy'", path);
+            handleNotFoundByStrategy(data, path, null, e);
+        }
+		
+		for (String key: keys) {
+		    // secretJson can be null at this point only if there is a permissive strategy.
+		    if (secretJson == null) {
+		        data.put(key, EMPTY);
+		        continue;
+		    }
+			if (secretJson.containsKey(key)) {
+				data.put(key, secretJson.get(key));
+			} else {
+			    log.info("Secret {} doesn't have a key {}.", path, key);
+				handleNotFoundByStrategy(data, path, key, null);
 			}
-			
-			for (String key: keys) {
-				if (secretJson.containsKey(key)) {
-					data.put(key, secretJson.get(key));
-				} else {
-					handleNotFoundByStrategy(data, keys, key);
-				}
-			}
-		} catch(ResourceNotFoundException e) {
-			if (this.notFoundStrategy == ParamNotFoundStrategy.FAIL) {
-				throw e;
-			}
-			log.info("Secret id " + path + "not found. Value will be handled according to a strategy defined by 'config.providers.ssm.param.ParameterNotFoundStrategy'");
-			handleNotFoundByStrategy(data, keys, null);
-			
 		}
 
 		return new ConfigData(data);
 	}
+
+    protected SecretsManagerClient checkOrInitSecretManagerClient() {
+        return cBuilder.build();
+    }
 	
 	@Override
 	public void subscribe(String path, Set<String> keys, ConfigChangeCallback callback) {
 	    log.info("Subscription is not implemented and will be ignored");
 	}
 
-
+	@Override
 	public void close() throws IOException {
 	}
 	
-	private void handleNotFoundByStrategy(Map<String, String> data, Set<String> keys, String key) {
-		if (this.notFoundStrategy == ParamNotFoundStrategy.IGNORE) {
-			//do nothing, we just ignore
-		} else if (this.notFoundStrategy == ParamNotFoundStrategy.EMPTY && keys != null && !keys.isEmpty()) {
-			for (String _key: keys) {
-				data.put(_key, "");
-			}
-		} else if (this.notFoundStrategy == ParamNotFoundStrategy.EMPTY && key != null && !key.isEmpty()) {
-			data.put(key, "");
+	private void handleNotFoundByStrategy(Map<String, String> data, String path, String key, RuntimeException e) {
+		if (SecretsManagerConfig.NOT_FOUND_IGNORE.equals(this.notFoundStrategy) 
+		        && key != null && !key.isBlank()) {
+		    data.put(key, "");
+		} else if (SecretsManagerConfig.NOT_FOUND_FAIL.equals(this.notFoundStrategy)) {
+		    if (e != null) {
+		        throw e;
+		    }else {
+		        throw new ConfigException(String.format("Secret undefined {}:{}", path, key));
+		    }
 		}
 	}
-
-	protected void checkOrInitSecretManagerClient() {
-		if (this.secretsClient == null) {
-			// if region is provided in config, use it, otherwise let the env provide it.
-			SecretsManagerClientBuilder secretsClientBuilder = SecretsManagerClient.builder();
-			if (region != null) {
-				try {
-					secretsClientBuilder = secretsClientBuilder.region(Region.of(region));
-				} catch (Exception e) {
-					log.error("Failed to set a region '" + region + "'. Using default region from the chain of environment settings... Exception: ", e);
-				}
-			}
-
-			this.secretsClient = secretsClientBuilder.build();
-		}
-	}
-
-	private static enum ParamNotFoundStrategy{
-		FAIL, NULL, EMPTY, IGNORE;
-		
-		static ParamNotFoundStrategy of(String strValue) {
-			if (strValue.equalsIgnoreCase("fail")) {
-				return FAIL;
-			} else if (strValue.equalsIgnoreCase("empty")) {
-				return EMPTY;
-			} else if (strValue.equalsIgnoreCase("ignore")) {
-				return IGNORE;
-			}
-			// Default
-			return IGNORE;
-		}
-	}
-
 }
