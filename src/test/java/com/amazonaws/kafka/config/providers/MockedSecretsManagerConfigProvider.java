@@ -12,12 +12,13 @@ import static org.mockito.Mockito.when;
 
 public class MockedSecretsManagerConfigProvider extends SecretsManagerConfigProvider {
     @Override
-    protected void checkOrInitSecretManagerClient() {
-        this.secretsClient = mock(SecretsManagerClient.class);
+    protected SecretsManagerClient checkOrInitSecretManagerClient() {
+        SecretsManagerClient secretsClient = mock(SecretsManagerClient.class);
         when(secretsClient.getSecretValue(request("AmazonMSK_TestKafkaConfig"))).thenAnswer(
                 (Answer<GetSecretValueResponse>) invocation -> response("{\"username\": \"John\", \"password\":\"Password123\"}")
         );
         when(secretsClient.getSecretValue(request("notFound"))).thenThrow(ResourceNotFoundException.class);
+        return secretsClient;
     }
 
     private GetSecretValueRequest request(String path) {

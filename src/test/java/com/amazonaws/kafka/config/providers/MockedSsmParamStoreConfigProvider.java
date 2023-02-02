@@ -12,8 +12,8 @@ import static org.mockito.Mockito.*;
 public class MockedSsmParamStoreConfigProvider extends SsmParamStoreConfigProvider {
 
     @Override
-    protected void checkOrInitSsmClient() {
-        this.ssmClient = mock(SsmClient.class);
+    protected SsmClient checkOrInitSsmClient() {
+        SsmClient ssmClient = mock(SsmClient.class);
         when(ssmClient.getParameter(request("/test/stringParam"))).thenAnswer(
                 (Answer<GetParameterResponse>) invocation -> response("stringParam", "test string value")
         );
@@ -27,6 +27,8 @@ public class MockedSsmParamStoreConfigProvider extends SsmParamStoreConfigProvid
                 (Answer<GetParameterResponse>) invocation -> response("secretParam", "secret password")
         );
         when(ssmClient.getParameter(request("/test/notFound"))).thenThrow(ParameterNotFoundException.class);
+        
+        return ssmClient;
     }
 
     private GetParameterRequest request(String param) {

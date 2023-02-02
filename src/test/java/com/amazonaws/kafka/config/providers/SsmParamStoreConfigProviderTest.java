@@ -43,16 +43,16 @@ public class SsmParamStoreConfigProviderTest {
 		props.put("config.providers", "ssm");
 		props.put("config.providers.ssm.class", "com.amazonaws.kafka.config.providers.MockedSsmParamStoreConfigProvider");
 		props.put("config.providers.ssm.param.region", "us-west-2");
-		props.put("config.providers.ssm.param.ParameterNotFoundStrategy", "fail");
+		props.put("config.providers.ssm.param.NotFoundStrategy", "fail");
 	}
     
     @Test
     public void testExistingKeys() {
 		// props.put("client.id", "${bootstrap.servers}"); // this doesn't work
-		props.put("stringKey", "${ssm:/test/stringParam}");
-		props.put("intKey", "${ssm:/test/intParam}");
-		props.put("listKey", "${ssm:/test/listParam}");
-		props.put("secretKey", "${ssm:/test/secretParam}");
+		props.put("stringKey", "${ssm::/test/stringParam}");
+		props.put("intKey", "${ssm::/test/intParam}");
+		props.put("listKey", "${ssm::/test/listParam}");
+		props.put("secretKey", "${ssm::/test/secretParam}");
 		
     	CustomConfig testConfig = new CustomConfig(props);
     	
@@ -64,7 +64,7 @@ public class SsmParamStoreConfigProviderTest {
 
 	@Test
 	public void testNonExistingKeys() {
-		props.put("notFound", "${ssm:/test/notFound}");
+		props.put("notFound", "${ssm::/test/notFound}");
 		assertThrows(ParameterNotFoundException.class, () -> new CustomConfig(props));
 	}
 
