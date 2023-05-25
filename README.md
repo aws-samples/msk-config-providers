@@ -18,7 +18,7 @@ Config providers, their configuration and usage are defined as properties of the
 config.providers=secretsmanager,ssm,s3import
 
 # provide implementation classes for each provider:
-config.providers.secretsmanager.class    = com.amazonaws.kafka.config.providers.SecretsMamagerConfigProvider
+config.providers.secretsmanager.class    = com.amazonaws.kafka.config.providers.SecretsManagerConfigProvider
 config.providers.ssm.class               = com.amazonaws.kafka.config.providers.SsmParamStoreConfigProvider
 config.providers.s3import.class          = com.amazonaws.kafka.config.providers.S3ImportConfigProvider
 
@@ -29,7 +29,7 @@ config.providers.s3import.param.region         = us-west-2
 # below is an example of config provider usage to supply a truststore location and its password. 
 # Actual parameter names depend on how those config providers are used in the client's configuration.
 database.ssl.truststore.password         = ${secretsmanager:mySslCertCredentials:ssl_trust_pass}
-database.ssl.truststore.location         = ${s3import:us-west-2:my_cert_bucket/pass/to/trustore_unique_filename.jks}
+database.ssl.truststore.location         = ${s3import:us-west-2:my_cert_bucket/pass/to/truststore_unique_filename.jks}
 ```
 
 More information about configuration of the config providers and usage, see below per config provider.
