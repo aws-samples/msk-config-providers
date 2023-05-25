@@ -18,7 +18,7 @@ Config providers, their configuration and usage are defined as properties of the
 config.providers=secretsmanager,ssm,s3import
 
 # provide implementation classes for each provider:
-config.providers.secretsmanager.class    = com.amazonaws.kafka.config.providers.SecretsMamagerConfigProvider
+config.providers.secretsmanager.class    = com.amazonaws.kafka.config.providers.SecretsManagerConfigProvider
 config.providers.ssm.class               = com.amazonaws.kafka.config.providers.SsmParamStoreConfigProvider
 config.providers.s3import.class          = com.amazonaws.kafka.config.providers.S3ImportConfigProvider
 
