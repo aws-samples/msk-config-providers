@@ -123,20 +123,24 @@ public class SsmParamStoreConfigProvider extends AwsServiceConfigProvider {
 		}
 		
 		SsmClient ssmClient = checkOrInitSsmClient();
+		Long ttl = null;
 
-		for (String key: keys) {
-			// String paramName = getStoreParamName(path, key);
+		for (String keyWithOptions: keys) {
+		    String key = parseKey(keyWithOptions);
+		    Map<String, String> options = parseKeyOptions(keyWithOptions);
+		    ttl = getUpdatedTtl(ttl, options);
+		    
 			GetParameterRequest parameterRequest = GetParameterRequest.builder().name(key).withDecryption(true).build();
 			try {
 				GetParameterResponse parameterResponse = ssmClient.getParameter(parameterRequest);
 				String value = parameterResponse.parameter().value();
-				data.put(key, value);
+				data.put(keyWithOptions, value);
 			} catch(ParameterNotFoundException e) {
 				log.info("Parameter " + key + "not found. Value will be handled according to a strategy defined by 'NotFoundStrategy'");
 				handleNotFoundByStrategy(data, path, key, e);
 			}
 		}
-		return new ConfigData(data);
+		return ttl == null ? new ConfigData(data) : new ConfigData(data, ttl);
 	}
 
     protected SsmClient checkOrInitSsmClient() {

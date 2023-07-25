@@ -17,6 +17,9 @@ public class MockedSecretsManagerConfigProvider extends SecretsManagerConfigProv
         when(secretsClient.getSecretValue(request("AmazonMSK_TestKafkaConfig"))).thenAnswer(
                 (Answer<GetSecretValueResponse>) invocation -> response("{\"username\": \"John\", \"password\":\"Password123\"}")
         );
+        when(secretsClient.getSecretValue(request("AmazonMSK_TestTTL"))).thenAnswer(
+                (Answer<GetSecretValueResponse>) invocation -> response("{\"username\": \"John\", \"password\":\"Password123\"}")
+        );
         when(secretsClient.getSecretValue(request("notFound"))).thenThrow(ResourceNotFoundException.class);
         return secretsClient;
     }

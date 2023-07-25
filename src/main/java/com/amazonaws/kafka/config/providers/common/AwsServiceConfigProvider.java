@@ -19,7 +19,11 @@ package com.amazonaws.kafka.config.providers.common;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigChangeCallback;
@@ -95,5 +99,46 @@ public abstract class AwsServiceConfigProvider implements ConfigProvider {
             }
             
         return cBuilder;
+    }
+    
+
+    protected String parseKey(String keyWithOptions) {
+        if (keyWithOptions == null) return keyWithOptions;
+        
+        return keyWithOptions.split("\\?", 2)[0];
+    }
+    
+    protected Map<String, String> parseKeyOptions(String keyWithOptions) {
+        
+        Map<String, String> options = new LinkedHashMap<>();
+        
+        if (keyWithOptions == null) return options;
+
+        String[] parsed = keyWithOptions.split("\\?", 2);
+        if (parsed.length < 2) return options;
+        
+        Matcher m = Pattern.compile("(\\w+)=(.*?)(?=,\\w+=|$)").matcher(parsed[1]);
+        while (m.find()) {
+            options.put(m.group(1), m.group(2));
+        }
+        
+        return options;
+    }
+    
+    protected Long getUpdatedTtl(Long currentTtl, Map<String, String> options) {
+        if (options == null || options.isEmpty()) return currentTtl;
+
+        String newTtlStr = options.get("ttl");
+        if (newTtlStr == null) return currentTtl;
+        
+        try {
+            Long newTtl = Long.valueOf(newTtlStr);
+            return currentTtl == null || currentTtl > newTtl 
+                    ? newTtl 
+                    : currentTtl;
+        }catch(Exception e) {
+            log.warn("TTL value '{}' is not a number", newTtlStr, e);
+        }
+        return currentTtl;
     }
 }

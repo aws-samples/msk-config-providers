@@ -56,6 +56,17 @@ public class SecretsManagerConfigProviderTest {
     }
 
     @Test
+    public void testTtl() {
+        props.put("username", "${secretsmanager:AmazonMSK_TestKafkaConfig:username?ttl=60000}");
+        props.put("password", "${secretsmanager:AmazonMSK_TestKafkaConfig:password}");
+        
+        CustomConfig testConfig = new CustomConfig(props);
+        
+        assertEquals("John", testConfig.getString("username"));
+        assertEquals("Password123", testConfig.getString("password"));
+    }
+
+    @Test
     public void testNonExistingSecret() {
         props.put("notFound", "${secretsmanager:notFound:noKey}");
         assertThrows(ResourceNotFoundException.class, () ->new CustomConfig(props));
