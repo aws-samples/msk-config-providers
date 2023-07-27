@@ -2,9 +2,9 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>software.amazon.msk</groupId>
 	<artifactId>msk-config-providers</artifactId>
-	<version>0.2.0-SNAPSHOT</version>
+	<version>0.2.0</version>
 	<name>msk-config-providers</name>
-	<description>custom config plugins for Kafka Connect</description>
+	<description>Custom config plugins for Kafka Connect</description>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
