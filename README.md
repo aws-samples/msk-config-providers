@@ -18,7 +18,7 @@ Config providers, their configuration and usage are defined as properties of the
 config.providers=secretsmanager,ssm,s3import
 
 # provide implementation classes for each provider:
-config.providers.secretsmanager.class    = com.amazonaws.kafka.config.providers.SecretsMamagerConfigProvider
+config.providers.secretsmanager.class    = com.amazonaws.kafka.config.providers.SecretsManagerConfigProvider
 config.providers.ssm.class               = com.amazonaws.kafka.config.providers.SsmParamStoreConfigProvider
 config.providers.s3import.class          = com.amazonaws.kafka.config.providers.S3ImportConfigProvider
 
@@ -35,6 +35,12 @@ database.ssl.truststore.location         = ${s3import:us-west-2:my_cert_bucket/p
 More information about configuration of the config providers and usage, see below per config provider.
 
 For a detailed documentation on config providers in general, please follow the Apache Kafka documentation.
+
+### Kafka Connect Users:
+
+Please note, that Kafka Connect uses two levels of configurations: workers and connectors.
+
+To avoid issues with validation of the connector configuration, users need to define config providers in workers properties, and then use the tokens in the connector properties.
 
 
 ## Build
