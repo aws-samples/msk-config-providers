@@ -38,9 +38,24 @@ For a detailed documentation on config providers in general, please follow the A
 
 ### Kafka Connect Users:
 
+** Configuration in distributed mode **
+
 Please note, that Kafka Connect uses two levels of configurations: workers and connectors.
 
 To avoid issues with validation of the connector configuration, users need to define config providers in workers properties, and then use the tokens in the connector properties.
+
+** TTL Support **
+
+Currently Secrets and System Manager Config Providers support time-to-live (TTL) configuration in milliseconds.
+
+```
+# Reload configuration and restart connector every 5 minutes:
+database.ssl.truststore.password         = ${secretsmanager:mySslCertCredentials:ssl_trust_pass?ttl=300000}
+```
+
+Note, 
+- TTL value is in milliseconds
+- upon an expiration, the entire connector will be restarted, regardless whether a value has been changed or not.
 
 
 ## Build
