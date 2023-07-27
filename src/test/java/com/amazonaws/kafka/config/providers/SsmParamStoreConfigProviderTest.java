@@ -49,14 +49,17 @@ public class SsmParamStoreConfigProviderTest {
     @Test
     public void testExistingKeys() {
 		// props.put("client.id", "${bootstrap.servers}"); // this doesn't work
-		props.put("stringKey", "${ssm::/test/stringParam}");
+        props.put("stringKey", "${ssm::/test/stringParam}");
+        props.put("stringKeyWithTTL", "${ssm::/test/stringParamWithTTL?ttl=60000}");
 		props.put("intKey", "${ssm::/test/intParam}");
 		props.put("listKey", "${ssm::/test/listParam}");
 		props.put("secretKey", "${ssm::/test/secretParam}");
 		
     	CustomConfig testConfig = new CustomConfig(props);
+
     	
         assertEquals("test string value", testConfig.getString("stringKey"));
+        assertEquals("test string value", testConfig.getString("stringKeyWithTTL"));
         assertEquals(777L, testConfig.getLong("intKey").longValue());
         assertEquals(Arrays.asList("el1,el2,el3".split(",")), testConfig.getList("listKey"));
         assertEquals("secret password", testConfig.getString("secretKey"));
@@ -72,7 +75,8 @@ public class SsmParamStoreConfigProviderTest {
     static class CustomConfig extends AbstractConfig {
     	final static String DEFAULT_DOC = "Default Doc";
     	final static ConfigDef CONFIG = new ConfigDef()
-    			.define("stringKey", Type.STRING, "defaultValue", Importance.HIGH, DEFAULT_DOC)
+                .define("stringKey", Type.STRING, "defaultValue", Importance.HIGH, DEFAULT_DOC)
+                .define("stringKeyWithTTL", Type.STRING, "defaultValue", Importance.HIGH, DEFAULT_DOC)
     			.define("intKey", Type.LONG, 0, Importance.MEDIUM, DEFAULT_DOC)
     			.define("listKey", Type.LIST, Collections.emptyList(), Importance.LOW, DEFAULT_DOC)
     			.define("secretKey", Type.STRING, "", Importance.LOW, DEFAULT_DOC)

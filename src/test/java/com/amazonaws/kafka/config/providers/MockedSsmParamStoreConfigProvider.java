@@ -17,6 +17,9 @@ public class MockedSsmParamStoreConfigProvider extends SsmParamStoreConfigProvid
         when(ssmClient.getParameter(request("/test/stringParam"))).thenAnswer(
                 (Answer<GetParameterResponse>) invocation -> response("stringParam", "test string value")
         );
+        when(ssmClient.getParameter(request("/test/stringParamWithTTL"))).thenAnswer(
+                (Answer<GetParameterResponse>) invocation -> response("stringParamWithTTL", "test string value")
+        );
         when(ssmClient.getParameter(request("/test/intParam"))).thenAnswer(
                 (Answer<GetParameterResponse>) invocation -> response("intParam", "777")
         );

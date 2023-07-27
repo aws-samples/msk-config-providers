@@ -147,21 +147,26 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
             handleNotFoundByStrategy(data, path, null, e);
         }
 		
-		for (String key: keys) {
+        Long ttl = null;
+        for (String keyWithOptions: keys) {
+            String key = parseKey(keyWithOptions);
+            Map<String, String> options = parseKeyOptions(keyWithOptions);
+            ttl = getUpdatedTtl(ttl, options);
+            
 		    // secretJson can be null at this point only if there is a permissive strategy.
 		    if (secretJson == null) {
 		        data.put(key, EMPTY);
 		        continue;
 		    }
 			if (secretJson.containsKey(key)) {
-				data.put(key, secretJson.get(key));
+				data.put(keyWithOptions, secretJson.get(key));
 			} else {
 			    log.info("Secret {} doesn't have a key {}.", path, key);
 				handleNotFoundByStrategy(data, path, key, null);
 			}
 		}
 
-		return new ConfigData(data);
+        return ttl == null ? new ConfigData(data) : new ConfigData(data, ttl);
 	}
 
     protected SecretsManagerClient checkOrInitSecretManagerClient() {
