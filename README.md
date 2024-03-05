@@ -26,10 +26,16 @@ config.providers.s3import.class          = com.amazonaws.kafka.config.providers.
 config.providers.secretsmanager.param.region   = us-west-2
 config.providers.s3import.param.region         = us-west-2
 
+# optional configuration if you need to access a Secret via an ARN (for example if in a different account)
+config.providers.secretsmanager.param.separator.replacement = |
+
 # below is an example of config provider usage to supply a truststore location and its password. 
 # Actual parameter names depend on how those config providers are used in the client's configuration.
 database.ssl.truststore.password         = ${secretsmanager:mySslCertCredentials:ssl_trust_pass}
 database.ssl.truststore.location         = ${s3import:us-west-2:my_cert_bucket/pass/to/trustore_unique_filename.jks}
+
+# Example of accessing a Secret via an ARN
+database.password = ${secretsmanager:arn|aws|secretsmanager|us-west-2|123477892456|secret|/db/admin_user_credentials-ieAE11:password}
 ```
 
 More information about configuration of the config providers and usage, see below per config provider.

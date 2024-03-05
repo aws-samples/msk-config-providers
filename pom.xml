@@ -2,7 +2,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>software.amazon.msk</groupId>
 	<artifactId>msk-config-providers</artifactId>
-	<version>0.3.0-SNAPSHOT</version>
+	<version>0.4.0-SNAPSHOT</version>
 	<name>msk-config-providers</name>
 	<description>custom config plugins for Kafka Connect</description>
 

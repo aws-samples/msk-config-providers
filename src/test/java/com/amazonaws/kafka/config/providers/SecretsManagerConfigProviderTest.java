@@ -42,6 +42,7 @@ public class SecretsManagerConfigProviderTest {
 		props.put("config.providers.secretsmanager.class", "com.amazonaws.kafka.config.providers.MockedSecretsManagerConfigProvider");
 		props.put("config.providers.secretsmanager.param.region", "us-west-2");
 		props.put("config.providers.secretsmanager.param.NotFoundStrategy", "fail");
+		props.put("config.providers.secretsmanager.param.separator.replacement", "|");
 	}
     
     @Test
@@ -53,6 +54,17 @@ public class SecretsManagerConfigProviderTest {
     	
     	assertEquals("John", testConfig.getString("username"));
     	assertEquals("Password123", testConfig.getString("password"));
+    }
+
+    @Test
+    public void testExistingKeysViaArn() {
+		props.put("username", "${secretsmanager:arn|aws|secretsmanager|ap-southeast-2|123456789|secret|AmazonMSK_my_secret:username}");
+		props.put("password", "${secretsmanager:arn|aws|secretsmanager|ap-southeast-2|123456789|secret|AmazonMSK_my_secret:password}");
+
+    	CustomConfig testConfig = new CustomConfig(props);
+
+    	assertEquals("John2", testConfig.getString("username"));
+    	assertEquals("Password567", testConfig.getString("password"));
     }
 
     @Test

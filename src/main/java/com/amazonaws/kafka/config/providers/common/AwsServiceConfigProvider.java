@@ -1,12 +1,12 @@
 /*
  * Copyright 2022 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this
  * software and associated documentation files (the "Software"), to deal in the Software
  * without restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
  * permit persons to whom the Software is furnished to do so.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
  * INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
  * PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
@@ -35,11 +35,12 @@ import software.amazon.awssdk.awscore.client.builder.AwsClientBuilder;
 import software.amazon.awssdk.regions.Region;
 
 public abstract class AwsServiceConfigProvider implements ConfigProvider {
-    
+
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private String region;
     private String endpoint;
+    private String separatorReplacement;
 
 
     public String getRegion() {
@@ -58,6 +59,14 @@ public abstract class AwsServiceConfigProvider implements ConfigProvider {
         this.endpoint = endpoint;
     }
 
+    public String getSeparatorReplacement() {
+        return separatorReplacement;
+    }
+
+    public void setSeparatorReplacement(String separatorReplacement) {
+        this.separatorReplacement = separatorReplacement;
+    }
+
     /**
      * Set common AWS configuration parameters, like region, endpoint, etc...
      * @param config
@@ -67,6 +76,7 @@ public abstract class AwsServiceConfigProvider implements ConfigProvider {
         // default region from configuration. It can be null, empty or blank.
         this.region = config.getString(CommonConfigUtils.REGION);
         this.endpoint = config.getString(CommonConfigUtils.ENDPOINT);
+        this.separatorReplacement = config.getString(CommonConfigUtils.SEPARATOR_REPLACEMENT);
     }
 
     @Override
@@ -77,7 +87,7 @@ public abstract class AwsServiceConfigProvider implements ConfigProvider {
 
     public void close() throws IOException {
     }
-    
+
     /**
      * Set configuration that is common to most AWS Clients.
      * @param <T>
@@ -85,11 +95,11 @@ public abstract class AwsServiceConfigProvider implements ConfigProvider {
      * @return
      */
     protected <T extends AwsClientBuilder<?,?>> T setClientCommonConfig(T cBuilder) {
-        
+
         if (this.region != null && !this.region.isBlank()) {
             cBuilder.region(Region.of(this.region));
         }
-        
+
         if (this.endpoint != null && !endpoint.isBlank())
             try {
                 cBuilder.endpointOverride(new URI(this.endpoint));
@@ -97,48 +107,57 @@ public abstract class AwsServiceConfigProvider implements ConfigProvider {
                 log.error("Invalid syntax, ", e);
                 throw new RuntimeException(e);
             }
-            
+
         return cBuilder;
     }
-    
+
 
     protected String parseKey(String keyWithOptions) {
         if (keyWithOptions == null) return keyWithOptions;
-        
+
         return keyWithOptions.split("\\?", 2)[0];
     }
-    
+
     protected Map<String, String> parseKeyOptions(String keyWithOptions) {
-        
+
         Map<String, String> options = new LinkedHashMap<>();
-        
+
         if (keyWithOptions == null) return options;
 
         String[] parsed = keyWithOptions.split("\\?", 2);
         if (parsed.length < 2) return options;
-        
+
         Matcher m = Pattern.compile("(\\w+)=(.*?)(?=,\\w+=|$)").matcher(parsed[1]);
         while (m.find()) {
             options.put(m.group(1), m.group(2));
         }
-        
+
         return options;
     }
-    
+
     protected Long getUpdatedTtl(Long currentTtl, Map<String, String> options) {
         if (options == null || options.isEmpty()) return currentTtl;
 
         String newTtlStr = options.get("ttl");
         if (newTtlStr == null) return currentTtl;
-        
+
         try {
             Long newTtl = Long.valueOf(newTtlStr);
-            return currentTtl == null || currentTtl > newTtl 
-                    ? newTtl 
+            return currentTtl == null || currentTtl > newTtl
+                    ? newTtl
                     : currentTtl;
         }catch(Exception e) {
             log.warn("TTL value '{}' is not a number", newTtlStr, e);
         }
         return currentTtl;
+    }
+
+    /**
+     * Unmask any ':' characters that were replaced in the original path via the Seperator Replacement value.
+     * @param providedPath path value parsed from `secretsmanager:` reference
+     * @return path with any ':' characters replaced back
+     */
+    protected String unmaskPath(String providedPath) {
+        return this.separatorReplacement != null && !this.separatorReplacement.isBlank() ? providedPath.replace(this.separatorReplacement, ":") : providedPath;
     }
 }
