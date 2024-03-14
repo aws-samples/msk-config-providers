@@ -37,10 +37,6 @@ public class CommonConfigUtils {
             + "If there is an endpoint for a service in a VPC, and it should be used instead of default one, "
             + "this is the way to explicitly provide one.";
 
-    public static final String SEPARATOR_REPLACEMENT = "separator.replacement";
-    private static final String SEPARATOR_REPLACEMENT_DOC = "(Optional) If the 'path' value of a Secret reference contains a ':' (for example if it is an ARN), "
-            + "this will fail parsing. This parameter allows specifying a replacement for the ':' character in the path being passed in, "
-            + "which will be changed back to ':' before being used to fetch the Secret value";
 
     /**
      * 
@@ -61,13 +57,6 @@ public class CommonConfigUtils {
                         "",
                         ConfigDef.Importance.MEDIUM,
                         ENDPOINT_DOC
-                        )
-                .define(
-                        SEPARATOR_REPLACEMENT,
-                        ConfigDef.Type.STRING,
-                        "",
-                        ConfigDef.Importance.MEDIUM,
-                        SEPARATOR_REPLACEMENT_DOC
                         )
                 ;
     }

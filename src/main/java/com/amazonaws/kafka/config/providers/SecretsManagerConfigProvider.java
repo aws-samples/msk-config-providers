@@ -17,6 +17,8 @@
 package com.amazonaws.kafka.config.providers;
 
 import java.io.IOException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -89,8 +91,8 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
     private SecretsManagerClientBuilder cBuilder;
 
     @Override
-	public void configure(Map<String, ?> configs) {
-	    this.config = new SecretsManagerConfig(configs);
+    public void configure(Map<String, ?> configs) {
+        this.config = new SecretsManagerConfig(configs);
         setCommonConfig(config);
 
         this.notFoundStrategy = config.getString(SecretsManagerConfig.NOT_FOUND_STRATEGY);
@@ -98,7 +100,7 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
         // set up a builder:
         this.cBuilder = SecretsManagerClient.builder();
         setClientCommonConfig(this.cBuilder);
-	}
+    }
 
     /**
      * Retrieves a secret from AWS Secrets Manager
@@ -115,32 +117,33 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
     /**
      * Retrieves secret's fields from a given secret.
      *
-     * @param providedPath AWS Secrets Manager <code> secret name or encoded ARN </code>
+     * @param encodedPath AWS Secrets Manager <code> secret name or encoded ARN </code>
      * @param keys fields inside a given secret.
      * @return the configuration data
      */
     @Override
-	public ConfigData get(String providedPath, Set<String> keys) {
+    public ConfigData get(String encodedPath, Set<String> keys) {
         Map<String, String> data = new HashMap<>();
-		if (providedPath == null || providedPath.isEmpty()
-			|| keys== null || keys.isEmpty()   ) {
-		    // if no fields provided, just ignore this usage
-			return new ConfigData(data);
-		}
-		String path = unmaskPath(providedPath);
-		GetSecretValueRequest request = GetSecretValueRequest.builder().secretId(path).build();
-		Map<String, String> secretJson = null;
-		try {
-			SecretsManagerClient secretsClient = checkOrInitSecretManagerClient();
-            GetSecretValueResponse response = secretsClient.getSecretValue(request);
-			String value = response.secretString();
+        if (encodedPath == null || encodedPath.isEmpty()
+            || keys== null || keys.isEmpty()) {
+            // if no fields provided, just ignore this usage
+            return new ConfigData(data);
+        }
 
-	        try {
-	            secretJson = new ObjectMapper().readValue(value, new TypeReference<>() {});
-	        } catch (Exception e) {
-	            log.error("Unexpected value of a secret's structure", e);
-	            throw new ConfigException(path, value, "Unexpected value of a secret's structure");
-	        }
+        String path = URLDecoder.decode(encodedPath, StandardCharsets.UTF_8);
+        GetSecretValueRequest request = GetSecretValueRequest.builder().secretId(path).build();
+        Map<String, String> secretJson = null;
+        try {
+            SecretsManagerClient secretsClient = checkOrInitSecretManagerClient();
+            GetSecretValueResponse response = secretsClient.getSecretValue(request);
+            String value = response.secretString();
+
+            try {
+                secretJson = new ObjectMapper().readValue(value, new TypeReference<>() {});
+            } catch (Exception e) {
+                log.error("Unexpected value of a secret's structure", e);
+                throw new ConfigException(path, value, "Unexpected value of a secret's structure");
+            }
         } catch(ResourceNotFoundException e) {
             log.info("Secret id {} not found. Value will be handled according to a strategy defined by 'NotFoundStrategy'", path);
             handleNotFoundByStrategy(data, path, null, e);
@@ -152,45 +155,45 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
             Map<String, String> options = parseKeyOptions(keyWithOptions);
             ttl = getUpdatedTtl(ttl, options);
 
-		    // secretJson can be null at this point only if there is a permissive strategy.
-		    if (secretJson == null) {
-		        data.put(key, EMPTY);
-		        continue;
-		    }
-			if (secretJson.containsKey(key)) {
-				data.put(keyWithOptions, secretJson.get(key));
-			} else {
-			    log.info("Secret {} doesn't have a key {}.", path, key);
-				handleNotFoundByStrategy(data, path, key, null);
-			}
-		}
+            // secretJson can be null at this point only if there is a permissive strategy.
+            if (secretJson == null) {
+                data.put(key, EMPTY);
+                continue;
+            }
+            if (secretJson.containsKey(key)) {
+                data.put(keyWithOptions, secretJson.get(key));
+            } else {
+                log.info("Secret {} doesn't have a key {}.", path, key);
+                handleNotFoundByStrategy(data, path, key, null);
+            }
+        }
 
         return ttl == null ? new ConfigData(data) : new ConfigData(data, ttl);
-	}
+    }
 
     protected SecretsManagerClient checkOrInitSecretManagerClient() {
         return cBuilder.build();
     }
 
-	@Override
-	public void subscribe(String path, Set<String> keys, ConfigChangeCallback callback) {
-	    log.info("Subscription is not implemented and will be ignored");
-	}
+    @Override
+    public void subscribe(String path, Set<String> keys, ConfigChangeCallback callback) {
+        log.info("Subscription is not implemented and will be ignored");
+    }
 
-	@Override
-	public void close() throws IOException {
-	}
+    @Override
+    public void close() throws IOException {
+    }
 
-	private void handleNotFoundByStrategy(Map<String, String> data, String path, String key, RuntimeException e) {
-		if (SecretsManagerConfig.NOT_FOUND_IGNORE.equals(this.notFoundStrategy)
-		        && key != null && !key.isBlank()) {
-		    data.put(key, "");
-		} else if (SecretsManagerConfig.NOT_FOUND_FAIL.equals(this.notFoundStrategy)) {
-		    if (e != null) {
-		        throw e;
-		    }else {
-		        throw new ConfigException(String.format("Secret undefined {}:{}", path, key));
-		    }
-		}
-	}
+    private void handleNotFoundByStrategy(Map<String, String> data, String path, String key, RuntimeException e) {
+        if (SecretsManagerConfig.NOT_FOUND_IGNORE.equals(this.notFoundStrategy)
+                && key != null && !key.isBlank()) {
+            data.put(key, "");
+        } else if (SecretsManagerConfig.NOT_FOUND_FAIL.equals(this.notFoundStrategy)) {
+            if (e != null) {
+                throw e;
+            }else {
+                throw new ConfigException(String.format("Secret undefined {}:{}", path, key));
+            }
+        }
+    }
 }

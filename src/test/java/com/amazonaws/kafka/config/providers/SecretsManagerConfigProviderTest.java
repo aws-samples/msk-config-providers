@@ -20,9 +20,12 @@ package com.amazonaws.kafka.config.providers;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.codec.Charsets;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigDef.Importance;
@@ -42,7 +45,6 @@ public class SecretsManagerConfigProviderTest {
 		props.put("config.providers.secretsmanager.class", "com.amazonaws.kafka.config.providers.MockedSecretsManagerConfigProvider");
 		props.put("config.providers.secretsmanager.param.region", "us-west-2");
 		props.put("config.providers.secretsmanager.param.NotFoundStrategy", "fail");
-		props.put("config.providers.secretsmanager.param.separator.replacement", "|");
 	}
     
     @Test
@@ -58,8 +60,33 @@ public class SecretsManagerConfigProviderTest {
 
     @Test
     public void testExistingKeysViaArn() {
-		props.put("username", "${secretsmanager:arn|aws|secretsmanager|ap-southeast-2|123456789|secret|AmazonMSK_my_secret:username}");
-		props.put("password", "${secretsmanager:arn|aws|secretsmanager|ap-southeast-2|123456789|secret|AmazonMSK_my_secret:password}");
+        String arn = URLEncoder.encode("arn:aws:secretsmanager:ap-southeast-2:123456789:secret:AmazonMSK_my_service/my_secret", StandardCharsets.UTF_8);
+        props.put("username", "${secretsmanager:" + arn + ":username}");
+		props.put("password", "${secretsmanager:" + arn + ":password}");
+
+    	CustomConfig testConfig = new CustomConfig(props);
+
+    	assertEquals("John2", testConfig.getString("username"));
+    	assertEquals("Password567", testConfig.getString("password"));
+    }
+
+    @Test
+    public void testExistingKeysViaArnWithEncodedValue() {
+        String arn = URLEncoder.encode("arn:aws:secretsmanager:ap-southeast-2:123456789:secret:AmazonMSK_my_service/my_secret%3A", StandardCharsets.UTF_8);
+		props.put("username", "${secretsmanager:" + arn + ":username}");
+		props.put("password", "${secretsmanager:" + arn + ":password}");
+
+    	CustomConfig testConfig = new CustomConfig(props);
+
+    	assertEquals("John3", testConfig.getString("username"));
+    	assertEquals("Password321", testConfig.getString("password"));
+    }
+
+    @Test
+    public void testExistingKeysViaHandEncodedArn() {
+        String arn = "arn%3Aaws%3Asecretsmanager%3Aap-southeast-2%3A123456789%3Asecret%3AAmazonMSK_my_service%2Fmy_secret";
+		props.put("username", "${secretsmanager:" + arn + ":username}");
+		props.put("password", "${secretsmanager:" + arn + ":password}");
 
     	CustomConfig testConfig = new CustomConfig(props);
 
