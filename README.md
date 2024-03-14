@@ -30,7 +30,13 @@ config.providers.s3import.param.region         = us-west-2
 # Actual parameter names depend on how those config providers are used in the client's configuration.
 database.ssl.truststore.password         = ${secretsmanager:mySslCertCredentials:ssl_trust_pass}
 database.ssl.truststore.location         = ${s3import:us-west-2:my_cert_bucket/pass/to/trustore_unique_filename.jks}
+
+# Example of accessing a Secret via an ARN which has been URL Encoded
+database.password = ${secretsmanager:arn%3Aaws%3Asecretsmanager%3Aus-west-2%3A123477892456%3Asecret%3A%2Fdb%2Fadmin_user_credentials-ieAE11:password}
 ```
+
+> NOTE: For the `secretsmanager` provider, the base parser from Kafka does not support using ARNs due to the `:` character. 
+> In this case, URL encode the ARN first, and it will be decoded correctly by this Provider. 
 
 More information about configuration of the config providers and usage, see below per config provider.
 

@@ -17,6 +17,12 @@ public class MockedSecretsManagerConfigProvider extends SecretsManagerConfigProv
         when(secretsClient.getSecretValue(request("AmazonMSK_TestKafkaConfig"))).thenAnswer(
                 (Answer<GetSecretValueResponse>) invocation -> response("{\"username\": \"John\", \"password\":\"Password123\"}")
         );
+        when(secretsClient.getSecretValue(request("arn:aws:secretsmanager:ap-southeast-2:123456789:secret:AmazonMSK_my_service/my_secret"))).thenAnswer(
+                (Answer<GetSecretValueResponse>) invocation -> response("{\"username\": \"John2\", \"password\":\"Password567\"}")
+        );
+        when(secretsClient.getSecretValue(request("arn:aws:secretsmanager:ap-southeast-2:123456789:secret:AmazonMSK_my_service/my_secret%3A"))).thenAnswer(
+                (Answer<GetSecretValueResponse>) invocation -> response("{\"username\": \"John3\", \"password\":\"Password321\"}")
+        );
         when(secretsClient.getSecretValue(request("AmazonMSK_TestTTL"))).thenAnswer(
                 (Answer<GetSecretValueResponse>) invocation -> response("{\"username\": \"John\", \"password\":\"Password123\"}")
         );
