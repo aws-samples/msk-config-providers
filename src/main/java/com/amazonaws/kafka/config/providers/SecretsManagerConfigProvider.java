@@ -89,6 +89,8 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
     private String notFoundStrategy;
 
     private SecretsManagerClientBuilder cBuilder;
+    private long timeLastBuilt;
+    private static final long BUILDER_TTL_MS = 1*60*1000; // 1 min TTL
 
     @Override
     public void configure(Map<String, ?> configs) {
@@ -96,8 +98,12 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
         setCommonConfig(config);
 
         this.notFoundStrategy = config.getString(SecretsManagerConfig.NOT_FOUND_STRATEGY);
-
+        initClientBuilder();
+    }
+    
+    private void initClientBuilder() {
         // set up a builder:
+        this.timeLastBuilt = System.currentTimeMillis();
         this.cBuilder = SecretsManagerClient.builder();
         setClientCommonConfig(this.cBuilder);
     }
@@ -171,7 +177,10 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
         return ttl == null ? new ConfigData(data) : new ConfigData(data, ttl);
     }
 
-    protected SecretsManagerClient checkOrInitSecretManagerClient() {
+    protected synchronized SecretsManagerClient checkOrInitSecretManagerClient() {
+        if (System.currentTimeMillis() > this.timeLastBuilt + BUILDER_TTL_MS) {
+            initClientBuilder();
+        }
         return cBuilder.build();
     }
 
