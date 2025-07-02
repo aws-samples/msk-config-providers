@@ -88,7 +88,7 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
     private SecretsManagerConfig config;
     private String notFoundStrategy;
 
-    private SecretsManagerClientBuilder cBuilder;
+    private SecretsManagerClient secretsManager;
 
     @Override
     public void configure(Map<String, ?> configs) {
@@ -98,8 +98,9 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
         this.notFoundStrategy = config.getString(SecretsManagerConfig.NOT_FOUND_STRATEGY);
 
         // set up a builder:
-        this.cBuilder = SecretsManagerClient.builder();
-        setClientCommonConfig(this.cBuilder);
+        SecretsManagerClientBuilder cBuilder = SecretsManagerClient.builder();
+        setClientCommonConfig(cBuilder);
+        this.secretsManager = cBuilder.build();
     }
 
     /**
@@ -172,7 +173,7 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
     }
 
     protected SecretsManagerClient checkOrInitSecretManagerClient() {
-        return cBuilder.build();
+        return this.secretsManager;
     }
 
     @Override
@@ -182,6 +183,12 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
 
     @Override
     public void close() throws IOException {
+        log.info("Closing provider, called by thread: {}",
+                Thread.currentThread().getName());
+        if (this.secretsManager != null) {
+            this.secretsManager.close();
+        }
+        super.close();
     }
 
     private void handleNotFoundByStrategy(Map<String, String> data, String path, String key, RuntimeException e) {
