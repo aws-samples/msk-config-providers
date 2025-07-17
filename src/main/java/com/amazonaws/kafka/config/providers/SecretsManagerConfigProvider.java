@@ -70,8 +70,8 @@ import software.amazon.awssdk.services.secretsmanager.model.ResourceNotFoundExce
  * @param region - defines a region to get a secret from.
  * @param NotFoundStrategy - defines an action in case requested secret or a key in a value cannot be resolved. <br>
  * <ul>Passible values are:
- * 	<ul>{@code fail} - (Default) the code will throw an exception {@code ConfigNotFoundException}</ul>
- * 	<ul>{@code ignore} - a value will remain with tokens without any change </ul>
+ *  <ul>{@code fail} - (Default) the code will throw an exception {@code ConfigNotFoundException}</ul>
+ *  <ul>{@code ignore} - a value will remain with tokens without any change </ul>
  * </ul>
  *
  *
@@ -93,6 +93,10 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
     @Override
     public void configure(Map<String, ?> configs) {
         this.config = new SecretsManagerConfig(configs);
+        configure(this.config);
+    }
+
+    public void configure(SecretsManagerConfig configs) {
         setCommonConfig(config);
 
         this.notFoundStrategy = config.getString(SecretsManagerConfig.NOT_FOUND_STRATEGY);
@@ -172,7 +176,10 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
         return ttl == null ? new ConfigData(data) : new ConfigData(data, ttl);
     }
 
-    protected SecretsManagerClient checkOrInitSecretManagerClient() {
+    protected synchronized SecretsManagerClient checkOrInitSecretManagerClient() {
+        if (secretsManager == null) {
+            configure(config);
+        }
         return this.secretsManager;
     }
 
@@ -187,6 +194,7 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
                 Thread.currentThread().getName());
         if (this.secretsManager != null) {
             this.secretsManager.close();
+            this.secretsManager = null;
         }
         super.close();
     }
