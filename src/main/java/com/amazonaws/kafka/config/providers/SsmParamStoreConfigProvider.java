@@ -29,6 +29,8 @@ import org.slf4j.LoggerFactory;
 
 import com.amazonaws.kafka.config.providers.common.AwsServiceConfigProvider;
 
+import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
+import software.amazon.awssdk.services.secretsmanager.SecretsManagerClientBuilder;
 import software.amazon.awssdk.services.ssm.SsmClient;
 import software.amazon.awssdk.services.ssm.SsmClientBuilder;
 import software.amazon.awssdk.services.ssm.model.GetParameterRequest;
@@ -81,19 +83,24 @@ public class SsmParamStoreConfigProvider extends AwsServiceConfigProvider {
 	private String notFoundStrategy;
 
 	private SsmParamStoreConfig config;
-    private SsmClientBuilder cBuilder;
+    private SsmClient ssmClient;
 
     @Override
 	public void configure(Map<String, ?> configs) {
         this.config = new SsmParamStoreConfig(configs);
-        setCommonConfig(config);
-
-        this.notFoundStrategy = config.getString(SsmParamStoreConfig.NOT_FOUND_STRATEGY);
-        
-        // set up a builder:
-        this.cBuilder = SsmClient.builder();
-        setClientCommonConfig(this.cBuilder);
+        configure();
 	}
+
+    private void configure() {
+        setCommonConfig(this.config);
+
+        this.notFoundStrategy = this.config.getString(SsmParamStoreConfig.NOT_FOUND_STRATEGY);
+
+        // set up a builder:
+        SsmClientBuilder cBuilder = SsmClient.builder();
+        setClientCommonConfig(cBuilder);
+        this.ssmClient = cBuilder.build();
+    }
 
     /**
      * Retrieves all parameters at the given path in SSM Parameters Store.
@@ -143,12 +150,22 @@ public class SsmParamStoreConfigProvider extends AwsServiceConfigProvider {
 		return ttl == null ? new ConfigData(data) : new ConfigData(data, ttl);
 	}
 
-    protected SsmClient checkOrInitSsmClient() {
-        return cBuilder.build();
+    protected synchronized SsmClient checkOrInitSsmClient() {
+        if (this.ssmClient == null) {
+            configure();
+        }
+        return this.ssmClient;
     }
 	
 	@Override
 	public void close() throws IOException {
+        log.info("Closing provider, called by thread: {}",
+                Thread.currentThread().getName());
+        if (this.ssmClient != null) {
+            this.ssmClient.close();
+            this.ssmClient = null;
+        }
+        super.close();
 	}
 	
     private void handleNotFoundByStrategy(Map<String, String> data, String path, String key, RuntimeException e) {
