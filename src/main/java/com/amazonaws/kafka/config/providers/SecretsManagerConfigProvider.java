@@ -93,10 +93,10 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
     @Override
     public void configure(Map<String, ?> configs) {
         this.config = new SecretsManagerConfig(configs);
-        configure(this.config);
+        configure();
     }
 
-    public void configure(SecretsManagerConfig configs) {
+    public void configure() {
         setCommonConfig(config);
 
         this.notFoundStrategy = config.getString(SecretsManagerConfig.NOT_FOUND_STRATEGY);
@@ -178,7 +178,7 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
 
     protected synchronized SecretsManagerClient checkOrInitSecretManagerClient() {
         if (secretsManager == null) {
-            configure(config);
+            configure();
         }
         return this.secretsManager;
     }
