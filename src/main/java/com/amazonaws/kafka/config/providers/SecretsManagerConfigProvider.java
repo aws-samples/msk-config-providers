@@ -70,8 +70,8 @@ import software.amazon.awssdk.services.secretsmanager.model.ResourceNotFoundExce
  * @param region - defines a region to get a secret from.
  * @param NotFoundStrategy - defines an action in case requested secret or a key in a value cannot be resolved. <br>
  * <ul>Passible values are:
- * 	<ul>{@code fail} - (Default) the code will throw an exception {@code ConfigNotFoundException}</ul>
- * 	<ul>{@code ignore} - a value will remain with tokens without any change </ul>
+ *  <ul>{@code fail} - (Default) the code will throw an exception {@code ConfigNotFoundException}</ul>
+ *  <ul>{@code ignore} - a value will remain with tokens without any change </ul>
  * </ul>
  *
  *
@@ -88,18 +88,23 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
     private SecretsManagerConfig config;
     private String notFoundStrategy;
 
-    private SecretsManagerClientBuilder cBuilder;
+    private SecretsManagerClient secretsManager;
 
     @Override
     public void configure(Map<String, ?> configs) {
         this.config = new SecretsManagerConfig(configs);
+        configure();
+    }
+
+    public void configure() {
         setCommonConfig(config);
 
         this.notFoundStrategy = config.getString(SecretsManagerConfig.NOT_FOUND_STRATEGY);
 
         // set up a builder:
-        this.cBuilder = SecretsManagerClient.builder();
-        setClientCommonConfig(this.cBuilder);
+        SecretsManagerClientBuilder cBuilder = SecretsManagerClient.builder();
+        setClientCommonConfig(cBuilder);
+        this.secretsManager = cBuilder.build();
     }
 
     /**
@@ -171,8 +176,11 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
         return ttl == null ? new ConfigData(data) : new ConfigData(data, ttl);
     }
 
-    protected SecretsManagerClient checkOrInitSecretManagerClient() {
-        return cBuilder.build();
+    protected synchronized SecretsManagerClient checkOrInitSecretManagerClient() {
+        if (secretsManager == null) {
+            configure();
+        }
+        return this.secretsManager;
     }
 
     @Override
@@ -182,6 +190,13 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
 
     @Override
     public void close() throws IOException {
+        log.info("Closing provider, called by thread: {}",
+                Thread.currentThread().getName());
+        if (this.secretsManager != null) {
+            this.secretsManager.close();
+            this.secretsManager = null;
+        }
+        super.close();
     }
 
     private void handleNotFoundByStrategy(Map<String, String> data, String path, String key, RuntimeException e) {
