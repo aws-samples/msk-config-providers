@@ -18,3 +18,4 @@
 com.amazonaws.kafka.config.providers.S3ImportConfigProvider
 com.amazonaws.kafka.config.providers.SecretsManagerConfigProvider
 com.amazonaws.kafka.config.providers.SsmParamStoreConfigProvider
+com.amazonaws.kafka.config.providers.RdsIamAuthConfigProvider
