@@ -84,6 +84,7 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private static final String EMPTY = "";
+    private static final String RAW_SECRET_KEY = "*";
 
     private SecretsManagerConfig config;
     private String notFoundStrategy;
@@ -136,6 +137,11 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
         }
 
         String path = URLDecoder.decode(encodedPath, StandardCharsets.UTF_8);
+
+        if (keys.size() == 1 && keys.contains(RAW_SECRET_KEY)) {
+            return getRawSecret(path);
+        }
+
         GetSecretValueRequest request = GetSecretValueRequest.builder().secretId(path).build();
         Map<String, String> secretJson = null;
         try {
@@ -174,6 +180,25 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
         }
 
         return ttl == null ? new ConfigData(data) : new ConfigData(data, ttl);
+    }
+
+    /**
+     * Retrieves the raw secret string without JSON key extraction.
+     * Used when the key selector is '*' (e.g., ${secretsmanager:mySecret:*}).
+     * Returns the entire secret value as-is, allowing the consumer to parse it directly.
+     */
+    private ConfigData getRawSecret(String path) {
+        Map<String, String> data = new HashMap<>();
+        GetSecretValueRequest request = GetSecretValueRequest.builder().secretId(path).build();
+        try {
+            SecretsManagerClient secretsClient = checkOrInitSecretManagerClient();
+            GetSecretValueResponse response = secretsClient.getSecretValue(request);
+            data.put(RAW_SECRET_KEY, response.secretString());
+        } catch (ResourceNotFoundException e) {
+            log.info("Secret id {} not found. Value will be handled according to a strategy defined by 'NotFoundStrategy'", path);
+            handleNotFoundByStrategy(data, path, null, e);
+        }
+        return new ConfigData(data);
     }
 
     protected synchronized SecretsManagerClient checkOrInitSecretManagerClient() {

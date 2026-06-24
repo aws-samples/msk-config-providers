@@ -116,7 +116,23 @@ public class SecretsManagerConfigProviderTest {
         props.put("notFound", "${secretsmanager:AmazonMSK_TestKafkaConfig:noKey}");
         assertThrows(ConfigException.class, () ->new CustomConfig(props));
     }
-    
+
+    @Test
+    public void testRawSecretWildcardKey() {
+        props.put("connectionConfig", "${secretsmanager:AmazonMSK_NestedConfig:*}");
+
+        RawSecretConfig testConfig = new RawSecretConfig(props);
+
+        String rawJson = testConfig.getString("connectionConfig");
+        assertEquals("{\"host\": \"broker-1:9092\", \"credentials\": {\"username\": \"admin\", \"password\": \"secret\"}, \"options\": {\"timeout\": \"30\", \"retries\": \"3\"}}", rawJson);
+    }
+
+    @Test
+    public void testRawSecretNotFound() {
+        props.put("connectionConfig", "${secretsmanager:notFound:*}");
+        assertThrows(ResourceNotFoundException.class, () -> new RawSecretConfig(props));
+    }
+
     static class CustomConfig extends AbstractConfig {
         final static String DEFAULT_DOC = "Default Doc";
         final static ConfigDef CONFIG = new ConfigDef()
@@ -124,6 +140,16 @@ public class SecretsManagerConfigProviderTest {
                 .define("password", Type.STRING, "defaultValue", Importance.HIGH, DEFAULT_DOC)
                 ;
         public CustomConfig(Map<?, ?> originals) {
+            super(CONFIG, originals);
+        }
+    }
+
+    static class RawSecretConfig extends AbstractConfig {
+        final static String DEFAULT_DOC = "Default Doc";
+        final static ConfigDef CONFIG = new ConfigDef()
+                .define("connectionConfig", Type.STRING, "defaultValue", Importance.HIGH, DEFAULT_DOC)
+                ;
+        public RawSecretConfig(Map<?, ?> originals) {
             super(CONFIG, originals);
         }
     }

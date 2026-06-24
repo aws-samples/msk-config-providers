@@ -26,6 +26,9 @@ public class MockedSecretsManagerConfigProvider extends SecretsManagerConfigProv
         when(secretsClient.getSecretValue(request("AmazonMSK_TestTTL"))).thenAnswer(
                 (Answer<GetSecretValueResponse>) invocation -> response("{\"username\": \"John\", \"password\":\"Password123\"}")
         );
+        when(secretsClient.getSecretValue(request("AmazonMSK_NestedConfig"))).thenAnswer(
+                (Answer<GetSecretValueResponse>) invocation -> response("{\"host\": \"broker-1:9092\", \"credentials\": {\"username\": \"admin\", \"password\": \"secret\"}, \"options\": {\"timeout\": \"30\", \"retries\": \"3\"}}")
+        );
         when(secretsClient.getSecretValue(request("notFound"))).thenThrow(ResourceNotFoundException.class);
         return secretsClient;
     }
