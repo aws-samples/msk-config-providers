@@ -138,8 +138,11 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
 
         String path = URLDecoder.decode(encodedPath, StandardCharsets.UTF_8);
 
-        if (keys.size() == 1 && keys.contains(RAW_SECRET_KEY)) {
-            return getRawSecret(path);
+        if (keys.size() == 1 && parseKey(keys.iterator().next()).equals(RAW_SECRET_KEY)) {
+            String keyWithOptions = keys.iterator().next();
+            Map<String, String> options = parseKeyOptions(keyWithOptions);
+            Long ttl = getUpdatedTtl(null, options);
+            return getRawSecret(path, keyWithOptions, ttl);
         }
 
         GetSecretValueRequest request = GetSecretValueRequest.builder().secretId(path).build();
@@ -187,18 +190,18 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
      * Used when the key selector is '*' (e.g., ${secretsmanager:mySecret:*}).
      * Returns the entire secret value as-is, allowing the consumer to parse it directly.
      */
-    private ConfigData getRawSecret(String path) {
+    private ConfigData getRawSecret(String path, String keyWithOptions, Long ttl) {
         Map<String, String> data = new HashMap<>();
         GetSecretValueRequest request = GetSecretValueRequest.builder().secretId(path).build();
         try {
             SecretsManagerClient secretsClient = checkOrInitSecretManagerClient();
             GetSecretValueResponse response = secretsClient.getSecretValue(request);
-            data.put(RAW_SECRET_KEY, response.secretString());
+            data.put(keyWithOptions, response.secretString());
         } catch (ResourceNotFoundException e) {
             log.info("Secret id {} not found. Value will be handled according to a strategy defined by 'NotFoundStrategy'", path);
             handleNotFoundByStrategy(data, path, null, e);
         }
-        return new ConfigData(data);
+        return ttl == null ? new ConfigData(data) : new ConfigData(data, ttl);
     }
 
     protected synchronized SecretsManagerClient checkOrInitSecretManagerClient() {

@@ -128,6 +128,16 @@ public class SecretsManagerConfigProviderTest {
     }
 
     @Test
+    public void testRawSecretWithTtl() {
+        props.put("connectionConfig", "${secretsmanager:AmazonMSK_NestedConfig:*?ttl=60000}");
+
+        RawSecretConfig testConfig = new RawSecretConfig(props);
+
+        String rawJson = testConfig.getString("connectionConfig");
+        assertEquals("{\"host\": \"broker-1:9092\", \"credentials\": {\"username\": \"admin\", \"password\": \"secret\"}, \"options\": {\"timeout\": \"30\", \"retries\": \"3\"}}", rawJson);
+    }
+
+    @Test
     public void testRawSecretNotFound() {
         props.put("connectionConfig", "${secretsmanager:notFound:*}");
         assertThrows(ResourceNotFoundException.class, () -> new RawSecretConfig(props));
