@@ -29,13 +29,25 @@ public class SecretsManagerConfig extends AbstractConfig{
     public static final String NOT_FOUND_STRATEGY = "NotFoundStrategy";
     public static final String NOT_FOUND_FAIL = "fail";
     public static final String NOT_FOUND_IGNORE = "ignore";
-    
-    private static final String NOT_FOUND_STRATEGY_DOC = 
+
+    public static final String RAW_SECRET_ENCODING = "RawSecretEncoding";
+    public static final String RAW_SECRET_ENCODING_NONE = "none";
+    public static final String RAW_SECRET_ENCODING_BASE64 = "base64";
+
+    private static final String NOT_FOUND_STRATEGY_DOC =
             "An action to take in case a secret cannot be found. "
             + "Possible actions are: `ignore` and `fail`. <br>"
             + "If `ignore` is selected and a secret cannot be found, the empty string will be assigned to a parameter.<br>"
             + "If `fail` is selected, the config provider will throw an exception to signal the issue.<br>"
             + "If there is a connectivity or access issue with AWS Secrets Manager service, an exception will be thrown.";
+
+    private static final String RAW_SECRET_ENCODING_DOC =
+            "Encoding to apply when returning the entire secret value via the two-segment form (e.g., ${secretsmanager:mySecret}). "
+            + "Possible values are: `none` and `base64`. <br>"
+            + "If `none` is selected, the raw secret string is returned as-is. "
+            + "Note: if the secret value contains double quotes (e.g., JSON), these must be escaped for use in JAAS configs.<br>"
+            + "If `base64` is selected, the secret string is Base64-encoded before being returned, "
+            + "which avoids special character escaping requirements.";
 
     public SecretsManagerConfig(Map<?, ?> originals) {
         super(config(), originals);
@@ -50,7 +62,14 @@ public class SecretsManagerConfig extends AbstractConfig{
                         ValidString.in(NOT_FOUND_FAIL, NOT_FOUND_IGNORE),
                         ConfigDef.Importance.LOW,
                         NOT_FOUND_STRATEGY_DOC
-                        )
-                ;
+                )
+                .define(
+                        RAW_SECRET_ENCODING,
+                        ConfigDef.Type.STRING,
+                        RAW_SECRET_ENCODING_NONE,
+                        ValidString.in(RAW_SECRET_ENCODING_NONE, RAW_SECRET_ENCODING_BASE64),
+                        ConfigDef.Importance.LOW,
+                        RAW_SECRET_ENCODING_DOC
+                );
     }
 }

@@ -118,8 +118,8 @@ public class SecretsManagerConfigProviderTest {
     }
 
     @Test
-    public void testRawSecretWildcardKey() {
-        props.put("connectionConfig", "${secretsmanager:AmazonMSK_NestedConfig:*}");
+    public void testRawSecretTwoSegmentForm() {
+        props.put("connectionConfig", "${secretsmanager:AmazonMSK_NestedConfig}");
 
         RawSecretConfig testConfig = new RawSecretConfig(props);
 
@@ -128,18 +128,53 @@ public class SecretsManagerConfigProviderTest {
     }
 
     @Test
-    public void testRawSecretWithTtl() {
-        props.put("connectionConfig", "${secretsmanager:AmazonMSK_NestedConfig:*?ttl=60000}");
+    public void testRawSecretTwoSegmentFormWithTtl() {
+        props.put("connectionConfig", "${secretsmanager:AmazonMSK_NestedConfig?ttl=60000}");
 
         RawSecretConfig testConfig = new RawSecretConfig(props);
 
         String rawJson = testConfig.getString("connectionConfig");
         assertEquals("{\"host\": \"broker-1:9092\", \"credentials\": {\"username\": \"admin\", \"password\": \"secret\"}, \"options\": {\"timeout\": \"30\", \"retries\": \"3\"}}", rawJson);
+    }
+
+    @Test
+    public void testRawSecretTwoSegmentFormViaArn() {
+        String arn = URLEncoder.encode("arn:aws:secretsmanager:ap-southeast-2:123456789:secret:AmazonMSK_my_service/my_secret", StandardCharsets.UTF_8);
+        props.put("connectionConfig", "${secretsmanager:" + arn + "}");
+
+        RawSecretConfig testConfig = new RawSecretConfig(props);
+
+        String rawJson = testConfig.getString("connectionConfig");
+        assertEquals("{\"username\": \"John2\", \"password\":\"Password567\"}", rawJson);
+    }
+
+    @Test
+    public void testRawSecretTwoSegmentFormBase64Encoded() {
+        props.put("config.providers.secretsmanager.param.RawSecretEncoding", "base64");
+        props.put("connectionConfig", "${secretsmanager:AmazonMSK_NestedConfig}");
+
+        RawSecretConfig testConfig = new RawSecretConfig(props);
+
+        String encoded = testConfig.getString("connectionConfig");
+        String decoded = new String(java.util.Base64.getDecoder().decode(encoded), java.nio.charset.StandardCharsets.UTF_8);
+        assertEquals("{\"host\": \"broker-1:9092\", \"credentials\": {\"username\": \"admin\", \"password\": \"secret\"}, \"options\": {\"timeout\": \"30\", \"retries\": \"3\"}}", decoded);
+    }
+
+    @Test
+    public void testRawSecretTwoSegmentFormBase64EncodedWithTtl() {
+        props.put("config.providers.secretsmanager.param.RawSecretEncoding", "base64");
+        props.put("connectionConfig", "${secretsmanager:AmazonMSK_NestedConfig?ttl=60000}");
+
+        RawSecretConfig testConfig = new RawSecretConfig(props);
+
+        String encoded = testConfig.getString("connectionConfig");
+        String decoded = new String(java.util.Base64.getDecoder().decode(encoded), java.nio.charset.StandardCharsets.UTF_8);
+        assertEquals("{\"host\": \"broker-1:9092\", \"credentials\": {\"username\": \"admin\", \"password\": \"secret\"}, \"options\": {\"timeout\": \"30\", \"retries\": \"3\"}}", decoded);
     }
 
     @Test
     public void testRawSecretNotFound() {
-        props.put("connectionConfig", "${secretsmanager:notFound:*}");
+        props.put("connectionConfig", "${secretsmanager:notFound}");
         assertThrows(ResourceNotFoundException.class, () -> new RawSecretConfig(props));
     }
 

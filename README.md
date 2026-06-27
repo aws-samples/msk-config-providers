@@ -63,6 +63,35 @@ Note,
 - TTL value is in milliseconds
 - upon an expiration, the entire connector will be restarted, regardless whether a value has been changed or not.
 
+** Raw Secret Retrieval **
+
+The `secretsmanager` provider supports retrieving the entire secret value as a raw string by omitting the key from the reference (two-segment form). This is useful when the secret contains nested JSON or other structures that cannot be represented as flat key-value pairs.
+
+```
+# Retrieve the entire secret value as a raw string:
+my.config = ${secretsmanager:mySecretName}
+
+# Also works with URL-encoded ARNs:
+my.config = ${secretsmanager:arn%3Aaws%3Asecretsmanager%3Aus-west-2%3A123456789%3Asecret%3AmySecret}
+
+# TTL is supported with the two-segment form:
+my.config = ${secretsmanager:mySecretName?ttl=300000}
+```
+
+By default the raw secret string is returned as-is. If the secret value contains characters that require escaping in your configuration context (e.g., double quotes in JAAS configs), you can configure the provider to return a Base64-encoded string instead:
+
+```
+# Configure Base64 encoding for raw secret retrieval:
+config.providers.secretsmanager.param.RawSecretEncoding = base64
+
+# The resolved value will be a Base64-encoded string that your application decodes at runtime:
+my.config = ${secretsmanager:mySecretName}
+```
+
+Supported values for `RawSecretEncoding`:
+- `none` (default) — returns the raw secret string as-is
+- `base64` — returns the secret string Base64-encoded
+
 
 ## Build
 
