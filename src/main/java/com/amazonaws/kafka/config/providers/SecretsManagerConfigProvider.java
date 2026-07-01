@@ -19,6 +19,7 @@ package com.amazonaws.kafka.config.providers;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -58,10 +59,14 @@ import software.amazon.awssdk.services.secretsmanager.model.ResourceNotFoundExce
  * #        Step 2. Usage of AWS secrets manager as config provider:
  * db.username=${secretsmanager:AmazonMSK_TestKafkaConfig:username}
  * db.password=${secretsmanager:AmazonMSK_TestKafkaConfig:password}
+ *
+ * #        Alternatively, omit the key to retrieve the entire secret value as a raw string:
+ * db.config=${secretsmanager:AmazonMSK_TestKafkaConfig}
  * </pre>
  *
- * Note, this config provider implementation assumes secret values will be returned in Json format.
- * Nested values aren't supported at this point.<br>
+ * Note, the three-segment form assumes secret values will be returned in Json format.
+ * Nested values aren't supported at this point. The two-segment form (no key) returns the
+ * raw secret string without any JSON parsing, allowing the consumer to handle the structure directly.<br>
  *
  * SecretsManagerConfigProvider can be configured using parameters.<br>
  * Format:<br>
@@ -87,6 +92,7 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
 
     private SecretsManagerConfig config;
     private String notFoundStrategy;
+    private String rawSecretEncoding;
 
     private SecretsManagerClient secretsManager;
 
@@ -100,6 +106,7 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
         setCommonConfig(config);
 
         this.notFoundStrategy = config.getString(SecretsManagerConfig.NOT_FOUND_STRATEGY);
+        this.rawSecretEncoding = config.getString(SecretsManagerConfig.RAW_SECRET_ENCODING);
 
         // set up a builder:
         SecretsManagerClientBuilder cBuilder = SecretsManagerClient.builder();
@@ -129,13 +136,23 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
     @Override
     public ConfigData get(String encodedPath, Set<String> keys) {
         Map<String, String> data = new HashMap<>();
-        if (encodedPath == null || encodedPath.isEmpty()
-            || keys== null || keys.isEmpty()) {
+        if (encodedPath == null || keys == null || keys.isEmpty()) {
             // if no fields provided, just ignore this usage
             return new ConfigData(data);
         }
 
         String path = URLDecoder.decode(encodedPath, StandardCharsets.UTF_8);
+
+        if (path.isEmpty()) {
+            // Two-segment form: ${secretsmanager:secretName} — path is absent, key holds the secret identifier.
+            // Returns the entire secret value as-is for the consumer to parse directly.
+            String keyWithOptions = keys.iterator().next();
+            String secretId = URLDecoder.decode(parseKey(keyWithOptions), StandardCharsets.UTF_8);
+            Map<String, String> options = parseKeyOptions(keyWithOptions);
+            Long ttl = getUpdatedTtl(null, options);
+            return getRawSecret(secretId, keyWithOptions, ttl);
+        }
+
         GetSecretValueRequest request = GetSecretValueRequest.builder().secretId(path).build();
         Map<String, String> secretJson = null;
         try {
@@ -173,6 +190,29 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
             }
         }
 
+        return ttl == null ? new ConfigData(data) : new ConfigData(data, ttl);
+    }
+
+    /**
+     * Retrieves the raw secret string without JSON key extraction.
+     * Used when the two-segment form is specified (e.g., ${secretsmanager:mySecret}).
+     * Returns the entire secret value as-is, allowing the consumer to parse it directly.
+     */
+    private ConfigData getRawSecret(String path, String keyWithOptions, Long ttl) {
+        Map<String, String> data = new HashMap<>();
+        GetSecretValueRequest request = GetSecretValueRequest.builder().secretId(path).build();
+        try {
+            SecretsManagerClient secretsClient = checkOrInitSecretManagerClient();
+            GetSecretValueResponse response = secretsClient.getSecretValue(request);
+            String secretValue = response.secretString();
+            if (SecretsManagerConfig.RAW_SECRET_ENCODING_BASE64.equals(rawSecretEncoding)) {
+                secretValue = Base64.getEncoder().encodeToString(secretValue.getBytes(StandardCharsets.UTF_8));
+            }
+            data.put(keyWithOptions, secretValue);
+        } catch (ResourceNotFoundException e) {
+            log.info("Secret id {} not found. Value will be handled according to a strategy defined by 'NotFoundStrategy'", path);
+            handleNotFoundByStrategy(data, path, null, e);
+        }
         return ttl == null ? new ConfigData(data) : new ConfigData(data, ttl);
     }
 

@@ -116,7 +116,68 @@ public class SecretsManagerConfigProviderTest {
         props.put("notFound", "${secretsmanager:AmazonMSK_TestKafkaConfig:noKey}");
         assertThrows(ConfigException.class, () ->new CustomConfig(props));
     }
-    
+
+    @Test
+    public void testRawSecretTwoSegmentForm() {
+        props.put("connectionConfig", "${secretsmanager:AmazonMSK_NestedConfig}");
+
+        RawSecretConfig testConfig = new RawSecretConfig(props);
+
+        String rawJson = testConfig.getString("connectionConfig");
+        assertEquals("{\"host\": \"broker-1:9092\", \"credentials\": {\"username\": \"admin\", \"password\": \"secret\"}, \"options\": {\"timeout\": \"30\", \"retries\": \"3\"}}", rawJson);
+    }
+
+    @Test
+    public void testRawSecretTwoSegmentFormWithTtl() {
+        props.put("connectionConfig", "${secretsmanager:AmazonMSK_NestedConfig?ttl=60000}");
+
+        RawSecretConfig testConfig = new RawSecretConfig(props);
+
+        String rawJson = testConfig.getString("connectionConfig");
+        assertEquals("{\"host\": \"broker-1:9092\", \"credentials\": {\"username\": \"admin\", \"password\": \"secret\"}, \"options\": {\"timeout\": \"30\", \"retries\": \"3\"}}", rawJson);
+    }
+
+    @Test
+    public void testRawSecretTwoSegmentFormViaArn() {
+        String arn = URLEncoder.encode("arn:aws:secretsmanager:ap-southeast-2:123456789:secret:AmazonMSK_my_service/my_secret", StandardCharsets.UTF_8);
+        props.put("connectionConfig", "${secretsmanager:" + arn + "}");
+
+        RawSecretConfig testConfig = new RawSecretConfig(props);
+
+        String rawJson = testConfig.getString("connectionConfig");
+        assertEquals("{\"username\": \"John2\", \"password\":\"Password567\"}", rawJson);
+    }
+
+    @Test
+    public void testRawSecretTwoSegmentFormBase64Encoded() {
+        props.put("config.providers.secretsmanager.param.RawSecretEncoding", "base64");
+        props.put("connectionConfig", "${secretsmanager:AmazonMSK_NestedConfig}");
+
+        RawSecretConfig testConfig = new RawSecretConfig(props);
+
+        String encoded = testConfig.getString("connectionConfig");
+        String decoded = new String(java.util.Base64.getDecoder().decode(encoded), java.nio.charset.StandardCharsets.UTF_8);
+        assertEquals("{\"host\": \"broker-1:9092\", \"credentials\": {\"username\": \"admin\", \"password\": \"secret\"}, \"options\": {\"timeout\": \"30\", \"retries\": \"3\"}}", decoded);
+    }
+
+    @Test
+    public void testRawSecretTwoSegmentFormBase64EncodedWithTtl() {
+        props.put("config.providers.secretsmanager.param.RawSecretEncoding", "base64");
+        props.put("connectionConfig", "${secretsmanager:AmazonMSK_NestedConfig?ttl=60000}");
+
+        RawSecretConfig testConfig = new RawSecretConfig(props);
+
+        String encoded = testConfig.getString("connectionConfig");
+        String decoded = new String(java.util.Base64.getDecoder().decode(encoded), java.nio.charset.StandardCharsets.UTF_8);
+        assertEquals("{\"host\": \"broker-1:9092\", \"credentials\": {\"username\": \"admin\", \"password\": \"secret\"}, \"options\": {\"timeout\": \"30\", \"retries\": \"3\"}}", decoded);
+    }
+
+    @Test
+    public void testRawSecretNotFound() {
+        props.put("connectionConfig", "${secretsmanager:notFound}");
+        assertThrows(ResourceNotFoundException.class, () -> new RawSecretConfig(props));
+    }
+
     static class CustomConfig extends AbstractConfig {
         final static String DEFAULT_DOC = "Default Doc";
         final static ConfigDef CONFIG = new ConfigDef()
@@ -124,6 +185,16 @@ public class SecretsManagerConfigProviderTest {
                 .define("password", Type.STRING, "defaultValue", Importance.HIGH, DEFAULT_DOC)
                 ;
         public CustomConfig(Map<?, ?> originals) {
+            super(CONFIG, originals);
+        }
+    }
+
+    static class RawSecretConfig extends AbstractConfig {
+        final static String DEFAULT_DOC = "Default Doc";
+        final static ConfigDef CONFIG = new ConfigDef()
+                .define("connectionConfig", Type.STRING, "defaultValue", Importance.HIGH, DEFAULT_DOC)
+                ;
+        public RawSecretConfig(Map<?, ?> originals) {
             super(CONFIG, originals);
         }
     }
