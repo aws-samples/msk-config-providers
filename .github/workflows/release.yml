@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   release:
@@ -64,25 +65,9 @@ jobs:
       - name: Build and verify
         run: mvn -B verify --file pom.xml
 
-      - name: Commit release version
+      - name: Create release tag from trunk
         run: |
-          git add pom.xml
-          git commit -m "release: v${{ steps.version.outputs.release-version }}"
-
-      - name: Create tag
-        run: git tag "v${{ steps.version.outputs.release-version }}"
-
-      - name: Set next development version
-        run: mvn -B versions:set -DnewVersion=${{ steps.version.outputs.next-version }} -DgenerateBackupPoms=false
-
-      - name: Commit next development version
-        run: |
-          git add pom.xml
-          git commit -m "chore: bump to ${{ steps.version.outputs.next-version }}"
-
-      - name: Push changes and tag
-        run: |
-          git push origin trunk
+          git tag "v${{ steps.version.outputs.release-version }}" HEAD
           git push origin "v${{ steps.version.outputs.release-version }}"
 
       - name: Create GitHub Release
@@ -94,3 +79,19 @@ jobs:
           files: |
             target/msk-config-providers-${{ steps.version.outputs.release-version }}.jar
             target/shade-uber/msk-config-providers-${{ steps.version.outputs.release-version }}-all.jar
+
+      - name: Create version bump PR
+        run: |
+          BRANCH="chore/bump-to-${{ steps.version.outputs.next-version }}"
+          git checkout -b "$BRANCH"
+          mvn -B versions:set -DnewVersion=${{ steps.version.outputs.next-version }} -DgenerateBackupPoms=false
+          git add pom.xml
+          git commit -m "chore: bump to ${{ steps.version.outputs.next-version }}"
+          git push origin "$BRANCH"
+          gh pr create \
+            --base trunk \
+            --head "$BRANCH" \
+            --title "chore: bump to ${{ steps.version.outputs.next-version }}" \
+            --body "Automated version bump after release v${{ steps.version.outputs.release-version }}."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
