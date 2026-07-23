@@ -141,6 +141,15 @@
 									<exclude>jackson*:jackson-databind:jar:</exclude>
 								</excludes>
 							</artifactSet>
+							<relocations>
+								<relocation>
+									<pattern>software.amazon.awssdk</pattern>
+									<shadedPattern>com.amazonaws.kafka.config.shaded.software.amazon.awssdk</shadedPattern>
+								</relocation>
+							</relocations>
+							<transformers>
+								<transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+							</transformers>
 						</configuration>
 					</execution>
 				</executions>
