@@ -114,9 +114,9 @@ public class S3ImportConfigProvider extends AwsServiceConfigProvider {
         S3Client s3 = checkOrInitS3Client(path);
 
         for (String key: keys) {
+            Path pKey = Path.of(key);
+            Path destination = getDestination(this.localDir, pKey);
             try {
-                Path pKey = Path.of(key);
-                Path destination = getDestination(this.localDir, pKey);
                 log.debug("Local destination for file: {}", destination);
                 
                 if (Files.exists(destination)) {
@@ -132,11 +132,18 @@ public class S3ImportConfigProvider extends AwsServiceConfigProvider {
                         .build();
                 s3.getObject(s3GetObjectRequest, destination);
                 log.debug("Successfully imported a file from S3 bucket: s3://{}", key);
-                data.put(key, destination.toString());
-            } catch(NoSuchKeyException nske) {
-                // Simply throw an exception to indicate there are issues with the objects on S3
-                throw new RuntimeException("No object found at " + key, nske);
+            } catch(Exception e) {
+                // check if this is coming from S3 client running into race confition storing another version of the file:
+                if (Files.exists(destination)) {
+                    // Imported file may already exist on a file system. If tasks are restarting, 
+                    // or more than one task is running on a worker, they may use the same file
+                    log.warn("Failed to store a files, as it is already imported at destination: {}", destination, e);
+                }else {
+                    // Simply throw an exception to indicate there are issues with the objects on S3
+                    throw new RuntimeException("No object found at " + key, e);
+                }
             }
+            data.put(key, destination.toString());
         }
 
         return new ConfigData(data);
